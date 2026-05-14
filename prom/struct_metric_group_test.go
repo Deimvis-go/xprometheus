@@ -1,4 +1,4 @@
-package xprometheus
+package prom
 
 import (
 	"errors"

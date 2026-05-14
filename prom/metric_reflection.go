@@ -1,4 +1,4 @@
-package xprometheus
+package prom
 
 import "github.com/prometheus/client_golang/prometheus"
 

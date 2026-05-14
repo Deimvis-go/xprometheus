@@ -1,6 +1,8 @@
-package xprommetric
+package prommetric
 
 import "time"
+
+// TODO: make Scaler support BaseUnitName() string
 
 type UnitScaler[UnitT any, BaseUnitT any] interface {
 	// Scale scales given value with unit

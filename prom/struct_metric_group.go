@@ -1,4 +1,4 @@
-package xprometheus
+package prom
 
 import (
 	"errors"
@@ -8,7 +8,16 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/Deimvis/go-ext/go1.25/ext"
+	"github.com/Deimvis/go-ext/go1.25/xcheck/xmust"
+	"github.com/Deimvis/go-ext/go1.25/xreflect"
+	"github.com/Deimvis/go-ext/go1.25/xslices"
 )
+
+// TODO: support auto creation of metrics:
+// specify autofill and specify labels in tags
+// - tag example: `metric:"autoinit(ls=['label1', 'label2'])"`
+// - New and ScanStruct should accept option IgnoreMetricsAutoinit
 
 func NewStructMetricGroup[T any](v T) *StructMetricGroup[T] {
 	return &StructMetricGroup[T]{v: v}
@@ -19,7 +28,7 @@ type StructMetricGroup[T any] struct {
 
 	// getters are used because
 	// collectors are struct fields
-	// and may be set at any time.
+	// and may be set in anytime.
 	selfCrsGetters   []func() (prometheus.Collector, error)
 	subgroupsGetters []func() (MetricGroup, error)
 	scanOnce         sync.Once
@@ -32,7 +41,8 @@ func (smg *StructMetricGroup[T]) Struct() *T {
 	return &smg.v
 }
 
-// Clone creates a copy, which operates over the same metrics,
+// Clone creates a copy,
+// which operates over the same metrics,
 // but may store them in different state
 // (e.g. with some labels precompiled).
 // Clone is primarily useful for independent
@@ -52,7 +62,7 @@ func (smg *StructMetricGroup[T]) Clone() *StructMetricGroup[T] {
 }
 
 // ScanStruct allows to explicitly call struct scanning.
-// It is unnecessary, because scan will happen implicitly
+// It is unnecessary, because scan will implicitly
 // when it's needed.
 func (smg *StructMetricGroup[T]) ScanStruct() []error {
 	smg.scanCollectorsOnce()
@@ -60,18 +70,18 @@ func (smg *StructMetricGroup[T]) ScanStruct() []error {
 }
 
 // Collectors returns collectors that were found
-// after scanning the internal struct and
+// after scanning internal struct and
 // only those that are not nil.
 func (smg *StructMetricGroup[T]) Collectors() []prometheus.Collector {
 	smg.scanCollectorsOnce()
 	return slices.Concat(
 		smg.SelfCollectors(),
-		flatten(mapSlice(smg.subgroups(), MetricGroup.Collectors)),
+		xslices.Flatten(ext.Map(smg.subgroups(), MetricGroup.Collectors)),
 	)
 }
 
 // SelfCollectors returns collectors that were found
-// after scanning the internal struct and
+// after scanning internal struct and
 // only those that are not nil and located directly
 // in the struct fields
 // (without recursion to fields that are groups).
@@ -100,11 +110,11 @@ func (smg *StructMetricGroup[T]) subgroups() []MetricGroup {
 }
 
 // ValidateAllFieldsHandled checks whether all fields of T
-// are recognized and handled, otherwise a non-nil error is returned.
+// are recognized and handled, otherwise non-nil error is returned.
 // It works recursively for fields that implement the same method.
 func (smg *StructMetricGroup[T]) ValidateAllFieldsHandled() error {
 	smg.scanCollectorsOnce()
-	ufErrs := filterSlice(smg.scanErrs, func(err error) bool {
+	ufErrs := ext.Filter(smg.scanErrs, func(err error) bool {
 		ufErr := unrecognizedFieldError{}
 		return errors.As(err, &ufErr)
 	})
@@ -114,8 +124,8 @@ func (smg *StructMetricGroup[T]) ValidateAllFieldsHandled() error {
 	return nil
 }
 
-// ValidateAllCollectorsInitialized checks whether all known
-// collectors are initialized, i.e., have a value.
+// ValidateAllCollectorsHaveValue checks whether all known
+// collectors are initialized, i.e., have value.
 // It works recursively for fields that implement the same method.
 func (smg *StructMetricGroup[T]) ValidateAllCollectorsInitialized() error {
 	smg.scanCollectorsOnce()
@@ -145,21 +155,21 @@ func (smg *StructMetricGroup[T]) scanCollectorsOnce() {
 }
 
 // scanCollectors scans struct fields
-// and handles if a field implements either
+// and handles if field implements either
 // prometheus.Collector or MetricGroup.
-// If a field stores nil value somewhere
+// If field stores nil value somewhere
 // in the indirection chain, it will be
-// assumed uninitialized, even though it may
+// assumed as uninitialized, even though it may
 // work correctly (e.g. nil pointer to struct
 // that implements prometheus.Collector and
 // does no indirection, making it work properly
-// - this will also be assumed uninitialized
+// - this will also be assumed as uninitialized
 // and won't be included into Collectors() output).
 func (smg *StructMetricGroup[T]) scanCollectors() {
 	v := reflect.ValueOf(&smg.v).Elem()
-	v = recursiveIndirect(v)
-	mustEq(v.Kind(), reflect.Struct,
-		"StructMetricGroup type parameter's internal Kind must be Struct")
+	v = xreflect.RecursiveIndirect(v)
+	xmust.Eq(v.Kind(), reflect.Struct,
+		"StructMetricGroup type paramter's internal Kind must be Struct")
 	vt := v.Type()
 	for i := 0; i < vt.NumField(); i++ {
 		sf := vt.Field(i)
@@ -207,12 +217,12 @@ func (smg *StructMetricGroup[T]) scanCollectors() {
 	}
 }
 
-// checkImplementationNotNil recursively traverses a struct
-// and checks that the final implementation of interfaceT
-// has a non-nil value
-// (a struct may implement an interface by embedding another value).
+// checkImplementationNotNil recursively traverses struct
+// and checks that final implementation of interfaceT
+// has not nil value
+// (struct may implement interface by embedding another value).
 func checkImplementationNotNil(v reflect.Value, interfaceT reflect.Type) error {
-	internalV := recursiveIndirect(v)
+	internalV := xreflect.RecursiveIndirect(v)
 	for (internalV.Kind() == reflect.Pointer ||
 		internalV.Kind() == reflect.Interface) &&
 		internalV.IsNil() {

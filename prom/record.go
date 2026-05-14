@@ -1,6 +1,9 @@
-package xprometheus
+package prom
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/Deimvis/go-ext/go1.25/xcheck/xmust"
+)
 
 type RecordControl interface {
 	GetLabels() prometheus.Labels
@@ -35,7 +38,7 @@ func (rc *recordControl) AddLabels(ls prometheus.Labels) {
 }
 
 func Record(fns ...RecordFn) {
-	mustTrue(len(fns) == 1, "TODO: support middleware chaining")
+	xmust.True(len(fns) == 1, "TODO: support middleware chaining")
 	fn := fns[0]
 	rc := NewRecordControl()
 	fn(rc)

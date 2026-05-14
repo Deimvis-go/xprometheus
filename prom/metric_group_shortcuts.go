@@ -1,10 +1,14 @@
-package xprometheus
+package prom
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/Deimvis-go/xprometheus/xprometheus/xprommetric"
+	"github.com/Deimvis-go/xprometheus/prom/prommetric"
 )
+
+// TODO: move to promss
+// TODO: rewrite RPSLatencyGroup as builder for IntervalMetricGroup
+// - naming settings must be required
+// - choose duration unit + suffix
 
 type RPSLatencyGroupOption func(*rpsLatencyGroupCfg)
 
@@ -33,7 +37,7 @@ func NewRPSLatencyGroup(
 				},
 				VariableLabels: finishLabels,
 			}),
-			xprommetric.NewHavingUnit(
+			prommetric.NewHavingUnit(
 				prometheus.V2.NewHistogramVec(prometheus.HistogramVecOpts{
 					HistogramOpts: prometheus.HistogramOpts{
 						Name:    baseName + cfg.naming.durationSuffix + cfg.naming.histogramSuffix,
@@ -41,7 +45,7 @@ func NewRPSLatencyGroup(
 					},
 					VariableLabels: finishLabels,
 				}),
-				xprommetric.DurationToSecondsScaler,
+				prommetric.DurationToSecondsScaler,
 			),
 		),
 	}
@@ -94,7 +98,7 @@ type rpsLatencyGroupCfg struct {
 }
 
 type intervalMetricsNaming struct {
-	// naming: {base_name}{start/finish/duration suffix}{counter/hist suffix}
+	// namping: {base_name}{start/finish/duration suffix}{counter/hist suffix}
 	startSuffix     string
 	finishSuffix    string
 	durationSuffix  string
@@ -102,13 +106,17 @@ type intervalMetricsNaming struct {
 	histogramSuffix string
 }
 
-var defaultRPSLatencyGroupConfig = rpsLatencyGroupCfg{
-	naming: intervalMetricsNaming{
-		startSuffix:     "_start",
-		finishSuffix:    "_finish",
-		durationSuffix:  "_duration",
-		counterSuffix:   "_count",
-		histogramSuffix: "", // NOTE: it's a good practice to leave a suffix with unit (e.g. _seconds)
-	},
-	latencyBuckets: prometheus.DefBuckets,
-}
+var (
+	// TODO: add base name to config and get rid of implicit defaults
+	// (require explicit passing of default config)
+	defaultRPSLatencyGroupConfig = rpsLatencyGroupCfg{
+		naming: intervalMetricsNaming{
+			startSuffix:     "_start",
+			finishSuffix:    "_finish",
+			durationSuffix:  "_duration",
+			counterSuffix:   "_count",
+			histogramSuffix: "", // NOTE: it's a good practice to leave a suffix with unit (e.g. _seconds)
+		},
+		latencyBuckets: prometheus.DefBuckets,
+	}
+)
